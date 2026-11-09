@@ -87,6 +87,13 @@ label{display:block;margin-top:15px}
 <section class="panel">
 <h2>5. Preparar video</h2>
 <button onclick="preparar()">Revisar proyecto</button>
+ <button onclick="revisarMontaje()">Preparar montaje</button>
+
+<button onclick="exportarVideo()">🎬 Exportar video MP4</button>
+
+<video id="reproductor" controls style="width:100%;margin-top:15px"></video>
+
+<a id="descargarVideo" style="display:block;color:#62d98b;margin-top:15px"></a>
 <p id="estado">Esperando archivos...</p>
 </section>
 </main>
