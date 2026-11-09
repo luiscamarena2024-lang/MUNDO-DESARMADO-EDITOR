@@ -1,0 +1,90 @@
+
+let archivosImagenes = [];
+let audioNarracion = null;
+let audioMusica = null;
+
+const imagenesInput = document.getElementById("imagenes");
+const audioInput = document.getElementById("audio");
+const musicaInput = document.getElementById("musica");
+
+if (imagenesInput) {
+    imagenesInput.addEventListener("change", () => {
+        archivosImagenes = Array.from(imagenesInput.files);
+        mostrarEstado(
+            "Imágenes cargadas: " + archivosImagenes.length
+        );
+    });
+}
+
+if (audioInput) {
+    audioInput.addEventListener("change", () => {
+        audioNarracion = audioInput.files[0] || null;
+        mostrarEstado(
+            audioNarracion ? "Narración cargada." : "Sin narración."
+        );
+    });
+}
+
+if (musicaInput) {
+    musicaInput.addEventListener("change", () => {
+        audioMusica = musicaInput.files[0] || null;
+        mostrarEstado(
+            audioMusica ? "Música cargada." : "Sin música."
+        );
+    });
+}
+
+function mostrarEstado(mensaje) {
+    const estado = document.getElementById("estado");
+    if (estado) estado.textContent = mensaje;
+}
+
+// Prepara una vista previa de las imágenes.
+function crearVistaPrevia() {
+    const anterior = document.getElementById("vistaPrevia");
+    if (anterior) anterior.remove();
+
+    const contenedor = document.createElement("section");
+    contenedor.id = "vistaPrevia";
+    contenedor.className = "panel";
+
+    const titulo = document.createElement("h2");
+    titulo.textContent = "Vista previa de imágenes";
+    contenedor.appendChild(titulo);
+
+    archivosImagenes.forEach((archivo) => {
+        const imagen = document.createElement("img");
+        imagen.src = URL.createObjectURL(archivo);
+        imagen.style.width = "120px";
+        imagen.style.margin = "5px";
+        imagen.style.borderRadius = "8px";
+        contenedor.appendChild(imagen);
+    });
+
+    document.querySelector("main").appendChild(contenedor);
+}
+
+// Comprueba que el proyecto tenga los archivos necesarios.
+function revisarMontaje() {
+    if (archivosImagenes.length === 0) {
+        mostrarEstado("Selecciona primero las imágenes.");
+        return;
+    }
+
+    if (!audioNarracion) {
+        mostrarEstado("Selecciona la narración.");
+        return;
+    }
+
+    crearVistaPrevia();
+    mostrarEstado(
+        "Proyecto preparado. Imágenes: " +
+        archivosImagenes.length +
+        ". Narración lista. " +
+        (audioMusica ? "Música lista." : "Sin música.")
+    );
+}
+
+window.revisarMontaje = revisarMontaje;
+
+console.log("Motor inicial de Mundo Desarmado cargado.");
