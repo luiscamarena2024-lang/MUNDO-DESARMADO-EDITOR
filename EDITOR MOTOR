@@ -1,90 +1,193 @@
+let motorVideo = null;
 
-let archivosImagenes = [];
-let audioNarracion = null;
-let audioMusica = null;
+async function cargarMotor() {
+    if (motorVideo) return motorVideo;
 
-const imagenesInput = document.getElementById("imagenes");
-const audioInput = document.getElementById("audio");
-const musicaInput = document.getElementById("musica");
-
-if (imagenesInput) {
-    imagenesInput.addEventListener("change", () => {
-        archivosImagenes = Array.from(imagenesInput.files);
-        mostrarEstado(
-            "Imágenes cargadas: " + archivosImagenes.length
-        );
-    });
-}
-
-if (audioInput) {
-    audioInput.addEventListener("change", () => {
-        audioNarracion = audioInput.files[0] || null;
-        mostrarEstado(
-            audioNarracion ? "Narración cargada." : "Sin narración."
-        );
-    });
-}
-
-if (musicaInput) {
-    musicaInput.addEventListener("change", () => {
-        audioMusica = musicaInput.files[0] || null;
-        mostrarEstado(
-            audioMusica ? "Música cargada." : "Sin música."
-        );
-    });
-}
-
-function mostrarEstado(mensaje) {
     const estado = document.getElementById("estado");
-    if (estado) estado.textContent = mensaje;
-}
+    estado.textContent = "Cargando motor de video...";
 
-// Prepara una vista previa de las imágenes.
-function crearVistaPrevia() {
-    const anterior = document.getElementById("vistaPrevia");
-    if (anterior) anterior.remove();
+    if (!window.FFmpegWASM || !window.FFmpegUtil) {
+        throw new Error("No se encontraron las bibliotecas FFmpeg. Revisa los scripts de index.html.");
+    }
 
-    const contenedor = document.createElement("section");
-    contenedor.id = "vistaPrevia";
-    contenedor.className = "panel";
+    const { FFmpeg } = FFmpegWASM;
+    const { toBlobURL } = FFmpegUtil;
 
-    const titulo = document.createElement("h2");
-    titulo.textContent = "Vista previa de imágenes";
-    contenedor.appendChild(titulo);
+    motorVideo = new FFmpeg();
 
-    archivosImagenes.forEach((archivo) => {
-        const imagen = document.createElement("img");
-        imagen.src = URL.createObjectURL(archivo);
-        imagen.style.width = "120px";
-        imagen.style.margin = "5px";
-        imagen.style.borderRadius = "8px";
-        contenedor.appendChild(imagen);
+    const base = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd";
+
+    await motorVideo.load({
+        coreURL: await toBlobURL(base + "/ffmpeg-core.js", "text/javascript"),
+        wasmURL: await toBlobURL(base + "/ffmpeg-core.wasm", "application/wasm")
     });
 
-    document.querySelector("main").appendChild(contenedor);
+    return motorVideo;
 }
 
-// Comprueba que el proyecto tenga los archivos necesarios.
-function revisarMontaje() {
-    if (archivosImagenes.length === 0) {
-        mostrarEstado("Selecciona primero las imágenes.");
-        return;
-    }
+function obtenerDuracion(archivo) {
+    return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(archivo);
+        const audio = new Audio(url);
 
-    if (!audioNarracion) {
-        mostrarEstado("Selecciona la narración.");
-        return;
-    }
+        audio.onloadedmetadata = () => {
+            const duracion = audio.duration;
+            URL.revokeObjectURL(url);
+            resolve(duracion);
+        };
 
-    crearVistaPrevia();
-    mostrarEstado(
-        "Proyecto preparado. Imágenes: " +
-        archivosImagenes.length +
-        ". Narración lista. " +
-        (audioMusica ? "Música lista." : "Sin música.")
+        audio.onerror = () => {
+            URL.revokeObjectURL(url);
+            reject(new Error("No se pudo leer la duración del audio."));
+        };
+    });
+}
+
+async function exportarVideo() {
+    const estado = document.getElementById("estado");
+    const boton = document.querySelector(
+        'button[onclick="exportarVideo()"]'
     );
+
+    try {
+        const imagenes = Array.from(
+            document.getElementById("imagenes").files
+        );
+
+        const narracion = document.getElementById("audio").files[0];
+        const musica = document.getElementById("musica").files[0];
+
+        if (!imagenes.length || !narracion) {
+            throw new Error("Selecciona imágenes y una narración.");
+        }
+
+        if (boton) boton.disabled = true;
+
+        const ffmpeg = await cargarMotor();
+        const duracion = await obtenerDuracion(narracion);
+        const duracionEscena = duracion / imagenes.length;
+
+        const formato = document.getElementById("formato").value;
+        const ancho = formato === "9:16" ? 720 : 1280;
+        const alto = formato === "9:16" ? 1280 : 720;
+
+        estado.textContent = "Preparando imágenes...";
+
+        const filtros = [];
+
+        for (let i = 0; i < imagenes.length; i++) {
+            const extension = imagenes[i].name.split(".").pop()
+                .toLowerCase().replace(/[^a-z0-9]/g, "");
+
+            const nombre = `imagen${i}.${extension || "jpg"}`;
+
+            await ffmpeg.writeFile(
+                nombre,
+                await FFmpegUtil.fetchFile(imagenes[i])
+            );
+
+            ffmpeg.on("progress", ({ progress }) => {
+                estado.textContent =
+                    "Generando video: " +
+                    Math.min(100, Math.round(progress * 100)) + "%";
+            });
+
+            filtros.push(
+                `[${i}:v]scale=${ancho}:${alto}:force_original_aspect_ratio=decrease,` +
+                `pad=${ancho}:${alto}:(ow-iw)/2:(oh-ih)/2,` +
+                `setsar=1,fps=30,format=yuv420p[v${i}]`
+            );
+        }
+
+        const nombreAudio = "narracion.mp3";
+
+        await ffmpeg.writeFile(
+            nombreAudio,
+            await FFmpegUtil.fetchFile(narracion)
+        );
+
+        const entradas = [];
+
+        for (let i = 0; i < imagenes.length; i++) {
+            entradas.push(
+                "-loop", "1",
+                "-t", String(duracionEscena),
+                "-i", `imagen${i}.${imagenes[i].name.split(".").pop().toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg"}`
+            );
+        }
+
+        entradas.push("-i", nombreAudio);
+
+        const indiceAudio = imagenes.length;
+        let mapaAudio = `${indiceAudio}:a`;
+        let filtrosAudio = "";
+
+        if (musica) {
+            await ffmpeg.writeFile(
+                "musica.mp3",
+                await FFmpegUtil.fetchFile(musica)
+            );
+
+            entradas.push("-i", "musica.mp3");
+
+            filtrosAudio =
+                `;[${indiceAudio}:a]volume=1[narr];` +
+                `[${indiceAudio + 1}:a]volume=0.12[mus];` +
+                `[narr][mus]amix=inputs=2:duration=first:dropout_transition=2[aout]`;
+
+            mapaAudio = "[aout]";
+        }
+
+        const unir = imagenes.map((_, i) => `[v${i}]`).join("");
+
+        filtros.push(
+            `${unir}concat=n=${imagenes.length}:v=1:a=0[outv]`
+        );
+
+        const filtroCompleto = filtros.join(";") + filtrosAudio;
+
+        estado.textContent = "Montando escenas y sonido...";
+
+        await ffmpeg.exec([
+            ...entradas,
+            "-filter_complex", filtroCompleto,
+            "-map", "[outv]",
+            "-map", mapaAudio,
+            "-c:v", "libx264",
+            "-preset", "ultrafast",
+            "-pix_fmt", "yuv420p",
+            "-c:a", "aac",
+            "-shortest",
+            "-movflags", "+faststart",
+            "video_final.mp4"
+        ]);
+
+        const resultado = await ffmpeg.readFile("video_final.mp4");
+
+        const blob = new Blob([resultado.buffer], {
+            type: "video/mp4"
+        });
+
+        const url = URL.createObjectURL(blob);
+
+        const reproductor = document.getElementById("reproductor");
+        reproductor.src = url;
+
+        const enlace = document.getElementById("descargarVideo");
+        enlace.href = url;
+        enlace.download = "MUNDO_DESARMADO_VIDEO.mp4";
+        enlace.textContent = "⬇ Descargar video MP4";
+
+        estado.textContent = "¡Video creado correctamente!";
+
+    } catch (error) {
+        estado.textContent = "Error: " + error.message;
+        console.error(error);
+    } finally {
+        if (boton) boton.disabled = false;
+    }
 }
 
-window.revisarMontaje = revisarMontaje;
+window.exportarVideo = exportarVideo;
 
-console.log("Motor inicial de Mundo Desarmado cargado.");
+console.log("Motor de montaje de Mundo Desarmado preparado.");
