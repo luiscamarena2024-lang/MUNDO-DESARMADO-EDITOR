@@ -1,1 +1,119 @@
 
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MUNDO DESARMADO EDITOR</title>
+<style>
+*{box-sizing:border-box}
+body{
+ margin:0;background:#101820;color:white;
+ font-family:Arial,sans-serif;padding:20px
+}
+header{text-align:center;padding:25px}
+h1{color:#62d98b}
+main{max-width:850px;margin:auto}
+.panel{
+ background:#1d2a35;padding:20px;
+ border-radius:14px;margin:15px 0
+}
+button{
+ background:#35b66b;color:white;border:0;
+ padding:13px 20px;border-radius:8px;
+ font-weight:bold;cursor:pointer;margin-top:10px
+}
+input,select{
+ width:100%;padding:12px;margin:8px 0;
+ border-radius:7px;border:1px solid #52616b;
+ background:#101820;color:white
+}
+label{display:block;margin-top:15px}
+#estado{color:#62d98b}
+</style>
+</head>
+<body>
+<header>
+<h1>🎬 MUNDO DESARMADO</h1>
+<p>EDITOR AUTOMÁTICO DE VIDEOS</p>
+<p>Entiende lo que mueve al mundo.</p>
+</header>
+
+<main>
+<section class="panel">
+<h2>1. Configurar proyecto</h2>
+<label>Nombre del video</label>
+<input id="nombre" placeholder="Escribe el título">
+
+<label>Estilo visual</label>
+<select id="estilo">
+<option>Elegir estilo</option>
+<option>Cinematográfico</option>
+<option>Stickman</option>
+<option>Anime</option>
+<option>2D</option>
+<option>3D</option>
+<option>Realista</option>
+<option>Personalizado</option>
+</select>
+
+<label>Formato</label>
+<select id="formato">
+<option value="16:9">Horizontal - YouTube</option>
+<option value="9:16">Vertical - Shorts</option>
+</select>
+</section>
+
+<section class="panel">
+<h2>2. Añadir imágenes</h2>
+<input type="file" id="imagenes" accept="image/*" multiple>
+<p id="cantidadImagenes">Ninguna imagen seleccionada.</p>
+</section>
+
+<section class="panel">
+<h2>3. Narración</h2>
+<select id="modoAudio">
+<option value="completo">Una narración completa</option>
+<option value="escenas">Un audio por escena</option>
+</select>
+<input type="file" id="audio" accept="audio/*">
+</section>
+
+<section class="panel">
+<h2>4. Música de fondo</h2>
+<input type="file" id="musica" accept="audio/*">
+</section>
+
+<section class="panel">
+<h2>5. Preparar video</h2>
+<button onclick="preparar()">Revisar proyecto</button>
+<p id="estado">Esperando archivos...</p>
+</section>
+</main>
+
+<script>
+const imagenes=document.getElementById("imagenes");
+imagenes.addEventListener("change",()=>{
+ document.getElementById("cantidadImagenes").textContent=
+ imagenes.files.length+" imágenes seleccionadas.";
+});
+
+function preparar(){
+ const nombre=document.getElementById("nombre").value;
+ const estilo=document.getElementById("estilo").value;
+ const fotos=imagenes.files.length;
+ const audio=document.getElementById("audio").files.length;
+
+ if(!nombre || estilo==="Elegir estilo" || fotos===0 || audio===0){
+  document.getElementById("estado").textContent=
+  "Faltan datos: completa el título, estilo, imágenes y narración.";
+  return;
+ }
+ document.getElementById("estado").textContent=
+ "Proyecto revisado correctamente. Imágenes: "+fotos+
+ ". Narración cargada. Próximo paso: motor de montaje.";
+}
+</script>
+</body>
+</html>
+
